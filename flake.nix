@@ -38,19 +38,15 @@
 
             nativeBuildInputs = [
               pkgs.pkg-config
+              pkgs.gtk4
+              pkgs.libadwaita
             ];
 
-            buildInputs =
-              pkgs.lib.optionals pkgs.stdenv.isLinux [
-                pkgs.gtk4
-                pkgs.libadwaita
-              ]
-              ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-                pkgs.libiconv
-                pkgs.darwin.apple_sdk.frameworks.AppKit
-                pkgs.darwin.apple_sdk.frameworks.WebKit
-                pkgs.darwin.apple_sdk.frameworks.Foundation
-              ];
+            # buildInputs =
+            #   pkgs.lib.optionals pkgs.stdenv.isLinux [
+            #   ]
+            #   ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            #   ];
           };
 
           # Native build
