@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use super::{ClickType, ClickerBackend, MouseButton};
 use anyhow::Result;
 use evdev::{AttributeSet, EventType, InputEvent, KeyCode, uinput::VirtualDevice};
@@ -22,6 +24,15 @@ impl PlatformClicker {
         Ok(Self { device })
     }
 
+    fn emit_click(&mut self, key: KeyCode) -> Result<()> {
+        self.device
+            .emit(&[InputEvent::new(EventType::KEY.0, key.code(), 1)])?;
+        self.device
+            .emit(&[InputEvent::new(EventType::KEY.0, key.code(), 0)])?;
+
+        Ok(())
+    }
+
     fn button_to_key(&self, button: MouseButton) -> KeyCode {
         match button {
             MouseButton::Left => KeyCode::BTN_LEFT,
@@ -36,17 +47,14 @@ impl ClickerBackend for PlatformClicker {
         let key = self.button_to_key(button);
 
         match click_type {
-            ClickType::Single => {
-                self.device
-                    .emit(&[InputEvent::new(EventType::KEY.0, key.code(), 1)])?;
-                self.device
-                    .emit(&[InputEvent::new(EventType::KEY.0, key.code(), 0)])?;
+            ClickType::Single => self.emit_click(key),
+            ClickType::Double => {
+                self.emit_click(key)?;
+                std::thread::sleep(Duration::from_millis(40));
+                self.emit_click(key)?;
+                Ok(())
             }
-            ClickType::Hold => {
-                self.device
-                    .emit(&[InputEvent::new(EventType::KEY.0, key.code(), 1)])?;
-            }
-        }
+        }?;
 
         Ok(())
     }
