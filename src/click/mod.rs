@@ -21,10 +21,29 @@ pub enum MouseButton {
     Middle,
 }
 
+impl ToString for MouseButton {
+    fn to_string(&self) -> String {
+        match self {
+            MouseButton::Left => "Left".to_string(),
+            MouseButton::Right => "Right".to_string(),
+            MouseButton::Middle => "Middle".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ClickType {
     Single,
-    Hold,
+    Double,
+}
+
+impl ToString for ClickType {
+    fn to_string(&self) -> String {
+        match self {
+            ClickType::Single => "Single".to_string(),
+            ClickType::Double => "Double".to_string(),
+        }
+    }
 }
 
 pub trait ClickerBackend: Send {

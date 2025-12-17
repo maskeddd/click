@@ -1,5 +1,6 @@
 mod app;
 mod click;
+mod dialogs;
 mod interval;
 mod icon_names {
     pub use shipped::*;
@@ -13,6 +14,6 @@ fn main() {
     tracing_subscriber::fmt::init();
 
     relm4_icons::initialize_icons(icon_names::GRESOURCE_BYTES, icon_names::RESOURCE_PREFIX);
-    let app = RelmApp::new("com.maskedd.click");
+    let app = RelmApp::new("lol.indent.click");
     app.run::<AppModel>(());
 }

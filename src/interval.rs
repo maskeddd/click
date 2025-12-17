@@ -1,17 +1,20 @@
-#[derive(Debug, Clone, Copy)]
-pub enum IntervalField {
-    Hours,
-    Minutes,
-    Seconds,
-    Milliseconds,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ClickInterval {
     pub hours: u8,
     pub minutes: u8,
     pub seconds: u8,
     pub milliseconds: u16,
+}
+
+impl Default for ClickInterval {
+    fn default() -> Self {
+        Self {
+            hours: 0,
+            minutes: 0,
+            seconds: 0,
+            milliseconds: 200,
+        }
+    }
 }
 
 impl ClickInterval {

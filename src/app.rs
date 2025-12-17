@@ -1,71 +1,117 @@
 use std::{
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
-    thread,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
 use gtk::prelude::*;
-use relm4::adw::prelude::*;
-use relm4::prelude::*;
+use relm4::{JoinHandle, actions::RelmActionGroup, adw::prelude::*};
+use relm4::{actions::RelmAction, prelude::*};
+use relm4_components::simple_adw_combo_row::SimpleComboRow;
+use tokio_util::sync::CancellationToken;
+use tracing::error;
 
 use crate::{
-    click::{Clicker, MouseButton},
+    click::{ClickType, Clicker, MouseButton},
+    dialogs::about::AboutDialog,
     icon_names,
-    interval::{ClickInterval, IntervalField},
+    interval::ClickInterval,
 };
+
+const DEFAULT_WINDOW_WIDTH: i32 = 440;
+const DEFAULT_WINDOW_HEIGHT: i32 = 612;
+const MIN_CLICK_DELAY_MS: u64 = 5;
 
 #[derive(Debug)]
 pub enum AppMsg {
     Start,
     Stop,
-
-    IntervalChanged { field: IntervalField, value: f64 },
-    MouseButtonChanged(u32),
+    MouseButtonChanged(usize),
+    ClickTypeChanged(usize),
+    HoursChanged(f64),
+    MinutesChanged(f64),
+    SecondsChanged(f64),
+    MillisecondsChanged(f64),
 }
 
-#[tracker::track]
 pub struct AppModel {
-    is_running: bool,
+    mouse_button_row: Controller<SimpleComboRow<MouseButton>>,
+    click_type_row: Controller<SimpleComboRow<ClickType>>,
     mouse_button: MouseButton,
+    click_type: ClickType,
     interval: ClickInterval,
-
-    #[tracker::no_eq]
+    is_running: bool,
     clicker: Option<Arc<Mutex<Clicker>>>,
-
-    #[tracker::no_eq]
-    click_thread: Option<thread::JoinHandle<()>>,
-
-    #[tracker::no_eq]
-    should_stop: Arc<AtomicBool>,
+    cancel_token: Option<CancellationToken>,
+    click_task: Option<JoinHandle<()>>,
+    runtime: tokio::runtime::Runtime,
 }
 
 impl AppModel {
-    fn create_spin_row(
-        title: &str,
-        value: f64,
-        min: f64,
-        max: f64,
-        field: IntervalField,
-        sender: &ComponentSender<Self>,
-    ) -> adw::SpinRow {
-        let adjustment = gtk::Adjustment::new(value, min, max, 1.0, 1.0, 0.0);
-        let row = adw::SpinRow::new(Some(&adjustment), 1.0, 0);
-        row.set_title(title);
+    fn start_clicking(&mut self) {
+        if self.is_running {
+            return;
+        }
+        let Some(clicker) = &self.clicker else {
+            error!("Clicker not initialized");
+            return;
+        };
 
-        let sender = sender.clone();
-        row.connect_changed(move |r| {
-            sender.input(AppMsg::IntervalChanged {
-                field,
-                value: r.value(),
-            });
+        let delay = self.interval.total_milliseconds().max(MIN_CLICK_DELAY_MS);
+        let button = self.mouse_button;
+        let click_type = self.click_type;
+        let clicker = Arc::clone(clicker);
+        let cancel_token = CancellationToken::new();
+
+        if let Ok(mut c) = clicker.lock() {
+            c.set_delay(delay);
+        }
+
+        let token_clone = cancel_token.clone();
+        self.is_running = true;
+
+        let handle = self.runtime.spawn(async move {
+            let mut next_tick = tokio::time::Instant::now();
+            loop {
+                next_tick += Duration::from_millis(delay);
+                tokio::select! {
+                    _ = tokio::time::sleep_until(next_tick) => {
+                        if let Ok(mut c) = clicker.lock() {
+                            if let Err(e) = c.click(button, click_type) {
+                                error!("Click error: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                    _ = token_clone.cancelled() => break,
+                }
+            }
         });
 
-        row
+        self.click_task = Some(handle);
+        self.cancel_token = Some(cancel_token);
+    }
+
+    fn stop_clicking(&mut self) {
+        if !self.is_running {
+            return;
+        }
+
+        self.is_running = false;
+
+        if let Some(token) = &self.cancel_token {
+            token.cancel();
+        }
+
+        if let Some(handle) = self.click_task.take() {
+            handle.abort();
+        }
+
+        self.cancel_token = None;
     }
 }
+
+relm4::new_action_group!(pub(super) WindowActionGroup, "win");
+relm4::new_stateless_action!(AboutAction, WindowActionGroup, "about");
 
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {
@@ -73,10 +119,18 @@ impl SimpleComponent for AppModel {
     type Input = AppMsg;
     type Output = ();
 
+    menu! {
+        primary_menu: {
+            section! {
+                "_About Click" => AboutAction,
+            }
+        }
+    }
+
     view! {
-        adw::ApplicationWindow {
-            set_default_width: 500,
-            set_default_height: 640,
+        main_window = adw::ApplicationWindow {
+            set_default_width: DEFAULT_WINDOW_WIDTH,
+            set_default_height: DEFAULT_WINDOW_HEIGHT,
             set_resizable: false,
 
             #[wrap(Some)]
@@ -87,11 +141,15 @@ impl SimpleComponent for AppModel {
                     #[wrap(Some)]
                     set_title_widget = &adw::ViewSwitcher {
                         set_policy: adw::ViewSwitcherPolicy::Wide,
-                        set_stack: Some(&view_stack),
-                    }
+                        set_stack: Some(&clicker_stack),
+                    },
+                    pack_end = &gtk::MenuButton {
+                        set_icon_name: icon_names::MENU,
+                        set_menu_model: Some(&primary_menu)
+                    },
                 },
 
-                #[name = "view_stack"]
+                #[name = "clicker_stack"]
                 adw::ViewStack {
                     set_vexpand: true,
 
@@ -105,38 +163,30 @@ impl SimpleComponent for AppModel {
                                 add = &adw::PreferencesGroup {
                                     set_title: "Interval",
 
-                                    #[local_ref]
-                                    hours_row -> adw::SpinRow {},
-
-                                    #[local_ref]
-                                    minutes_row -> adw::SpinRow {},
-
-                                    #[local_ref]
-                                    seconds_row -> adw::SpinRow {},
-
-                                    #[local_ref]
-                                    milliseconds_row -> adw::SpinRow {},
+                                    adw::SpinRow { set_title: "Hours",
+                                        set_adjustment: Some(&gtk::Adjustment::new(0.0, 0.0, 23.0, 1.0, 1.0, 0.0)),
+                                        connect_value_notify[sender] => move |s| sender.input(AppMsg::HoursChanged(s.value())),
+                                    },
+                                    adw::SpinRow { set_title: "Minutes",
+                                        set_adjustment: Some(&gtk::Adjustment::new(0.0, 0.0, 59.0, 1.0, 1.0, 0.0)),
+                                        connect_value_notify[sender] => move |s| sender.input(AppMsg::MinutesChanged(s.value())),
+                                    },
+                                    adw::SpinRow { set_title: "Seconds",
+                                        set_adjustment: Some(&gtk::Adjustment::new(0.0, 0.0, 59.0, 1.0, 1.0, 0.0)),
+                                        connect_value_notify[sender] => move |s| sender.input(AppMsg::SecondsChanged(s.value())),
+                                    },
+                                    adw::SpinRow { set_title: "Milliseconds",
+                                        set_adjustment: Some(&gtk::Adjustment::new(200.0, 0.0, 999.0, 1.0, 10.0, 0.0)),
+                                        connect_value_notify[sender] => move |s| sender.input(AppMsg::MillisecondsChanged(s.value())),
+                                    },
                                 },
 
                                 add = &adw::PreferencesGroup {
                                     set_title: "Input",
-
-                                    adw::ComboRow {
-                                        set_title: "Mouse Button",
-                                        set_model: Some(&gtk::StringList::new(&[
-                                            "Left", "Right", "Middle"
-                                        ])),
-                                        connect_selected_notify[sender] => move |row| {
-                                            sender.input(AppMsg::MouseButtonChanged(row.selected()))
-                                        }
-                                    },
-
-                                    adw::ComboRow {
-                                        set_title: "Click Type",
-                                        set_model: Some(&gtk::StringList::new(&[
-                                            "Single", "Hold"
-                                        ])),
-                                    },
+                                    #[local_ref]
+                                    mouse_button_row -> adw::ComboRow { set_title: "Mouse Button" },
+                                    #[local_ref]
+                                    click_type_row -> adw::ComboRow { set_title: "Click Type" },
                                 },
                             }
                         }
@@ -146,7 +196,7 @@ impl SimpleComponent for AppModel {
                 gtk::Box {
                     set_orientation: gtk::Orientation::Vertical,
                     set_spacing: 10,
-                    set_margin_all: 30,
+                    set_margin_all: 20,
 
                     adw::Clamp {
                         set_maximum_size: 500,
@@ -172,144 +222,85 @@ impl SimpleComponent for AppModel {
                                 set_sensitive: model.is_running,
                                 connect_clicked => AppMsg::Stop,
                             },
-                        }
-                    }
+                        },
+                    },
                 }
             }
         }
     }
 
     fn update(&mut self, msg: AppMsg, _sender: ComponentSender<Self>) {
-        self.reset();
+        use AppMsg::*;
         match msg {
-            AppMsg::Start => {
-                if let Some(clicker) = self.clicker.clone() {
-                    self.set_is_running(true);
-
-                    let delay = self.interval.total_milliseconds();
-                    let button = self.mouse_button;
-
-                    self.should_stop.store(false, Ordering::Relaxed);
-                    let should_stop = self.should_stop.clone();
-
-                    if let Ok(mut c) = clicker.lock() {
-                        c.set_delay(delay);
-                    }
-
-                    let handle = thread::spawn(move || {
-                        while !should_stop.load(Ordering::Relaxed) {
-                            thread::sleep(Duration::from_millis(delay));
-
-                            if should_stop.load(Ordering::Relaxed) {
-                                break;
-                            }
-
-                            match clicker.lock() {
-                                Ok(mut c) => {
-                                    if let Err(e) = c.click(button, crate::click::ClickType::Single)
-                                    {
-                                        eprintln!("Click error: {}", e);
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Failed to lock clicker: {}", e);
-                                    break;
-                                }
-                            }
-                        }
-                    });
-
-                    self.click_thread = Some(handle);
-                }
+            Start => self.start_clicking(),
+            Stop => self.stop_clicking(),
+            HoursChanged(v) => self.interval.hours = v as u8,
+            MinutesChanged(v) => self.interval.minutes = v as u8,
+            SecondsChanged(v) => self.interval.seconds = v as u8,
+            MillisecondsChanged(v) => self.interval.milliseconds = v as u16,
+            MouseButtonChanged(i) => {
+                self.mouse_button = [MouseButton::Left, MouseButton::Right, MouseButton::Middle]
+                    .get(i)
+                    .copied()
+                    .unwrap_or(MouseButton::Left)
             }
-            AppMsg::Stop => {
-                self.set_is_running(false);
-
-                self.should_stop.store(true, Ordering::Relaxed);
-
-                if let Some(handle) = self.click_thread.take() {
-                    let _ = handle.join();
-                }
-            }
-            AppMsg::IntervalChanged { field, value } => match field {
-                IntervalField::Hours => self.interval.hours = value as u8,
-                IntervalField::Minutes => self.interval.minutes = value as u8,
-                IntervalField::Seconds => self.interval.seconds = value as u8,
-                IntervalField::Milliseconds => self.interval.milliseconds = value as u16,
-            },
-            AppMsg::MouseButtonChanged(index) => {
-                self.mouse_button = match index {
-                    1 => MouseButton::Right,
-                    2 => MouseButton::Middle,
-                    _ => MouseButton::Left,
-                }
+            ClickTypeChanged(i) => {
+                self.click_type = [ClickType::Single, ClickType::Double]
+                    .get(i)
+                    .copied()
+                    .unwrap_or(ClickType::Single)
             }
         }
     }
 
-    fn init(
-        _: Self::Init,
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
-        let clicker = match Clicker::new(200) {
-            Ok(c) => Some(Arc::new(Mutex::new(c))),
-            Err(e) => {
-                eprintln!("Failed to create clicker: {}", e);
-                None
-            }
-        };
+    fn init(_init: (), _root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+        let clicker = Clicker::new(200)
+            .map(|c| Arc::new(Mutex::new(c)))
+            .map_err(|e| error!("Failed to create clicker: {}", e))
+            .ok();
+
+        let mouse_button_row = SimpleComboRow::builder()
+            .launch(SimpleComboRow {
+                variants: vec![MouseButton::Left, MouseButton::Right, MouseButton::Middle],
+                active_index: Some(0),
+            })
+            .forward(sender.input_sender(), AppMsg::MouseButtonChanged);
+
+        let click_type_row = SimpleComboRow::builder()
+            .launch(SimpleComboRow {
+                variants: vec![ClickType::Single, ClickType::Double],
+                active_index: Some(0),
+            })
+            .forward(sender.input_sender(), AppMsg::ClickTypeChanged);
 
         let model = AppModel {
-            is_running: false,
-            tracker: 0,
-            interval: ClickInterval {
-                hours: 0,
-                minutes: 0,
-                seconds: 0,
-                milliseconds: 200,
-            },
+            mouse_button_row,
+            click_type_row,
             mouse_button: MouseButton::Left,
+            click_type: ClickType::Single,
+            interval: ClickInterval::default(),
+            is_running: false,
             clicker,
-            click_thread: None,
-            should_stop: Arc::new(AtomicBool::new(false)),
+            cancel_token: None,
+            click_task: None,
+            runtime: tokio::runtime::Runtime::new().unwrap(),
         };
 
-        let hours_row = Self::create_spin_row(
-            "Hours",
-            model.interval.hours as f64,
-            0.0,
-            23.0,
-            IntervalField::Hours,
-            &sender,
-        );
-        let minutes_row = Self::create_spin_row(
-            "Minutes",
-            model.interval.minutes as f64,
-            0.0,
-            59.0,
-            IntervalField::Minutes,
-            &sender,
-        );
-        let seconds_row = Self::create_spin_row(
-            "Seconds",
-            model.interval.seconds as f64,
-            0.0,
-            59.0,
-            IntervalField::Seconds,
-            &sender,
-        );
-        let milliseconds_row = Self::create_spin_row(
-            "Milliseconds",
-            model.interval.milliseconds as f64,
-            5.0,
-            999.0,
-            IntervalField::Milliseconds,
-            &sender,
-        );
+        let mouse_button_row = model.mouse_button_row.widget();
+        let click_type_row = model.click_type_row.widget();
 
         let widgets = view_output!();
+
+        let mut actions = RelmActionGroup::<WindowActionGroup>::new();
+
+        let about_action = {
+            RelmAction::<AboutAction>::new_stateless(move |_| {
+                AboutDialog::builder().launch(()).detach();
+            })
+        };
+
+        actions.add_action(about_action);
+        actions.register_for_widget(&widgets.main_window);
 
         ComponentParts { model, widgets }
     }

@@ -4,6 +4,6 @@ fn main() {
         Some("com.maskedd.click"),
         None::<&str>,
         None::<&str>,
-        ["mouse-click"],
+        ["mouse-click", "menu"],
     );
 }
