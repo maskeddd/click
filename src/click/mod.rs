@@ -1,3 +1,5 @@
+use std::{fmt, time::Duration};
+
 use anyhow::Result;
 
 #[cfg(target_os = "linux")]
@@ -8,11 +10,11 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub use linux::PlatformClicker;
+pub use linux::PlatformInput;
 #[cfg(target_os = "macos")]
-pub use macos::PlatformClicker;
+pub use macos::PlatformInput;
 #[cfg(target_os = "windows")]
-pub use windows::PlatformClicker;
+pub use windows::PlatformInput;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MouseButton {
@@ -21,53 +23,57 @@ pub enum MouseButton {
     Middle,
 }
 
-impl ToString for MouseButton {
-    fn to_string(&self) -> String {
+impl fmt::Display for MouseButton {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MouseButton::Left => "Left".to_string(),
-            MouseButton::Right => "Right".to_string(),
-            MouseButton::Middle => "Middle".to_string(),
+            MouseButton::Left => write!(f, "Left"),
+            MouseButton::Right => write!(f, "Right"),
+            MouseButton::Middle => write!(f, "Middle"),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ClickType {
+pub enum ClickAction {
     Single,
     Double,
 }
 
-impl ToString for ClickType {
-    fn to_string(&self) -> String {
+impl fmt::Display for ClickAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ClickType::Single => "Single".to_string(),
-            ClickType::Double => "Double".to_string(),
+            ClickAction::Single => write!(f, "Single"),
+            ClickAction::Double => write!(f, "Double"),
         }
     }
 }
 
-pub trait ClickerBackend: Send {
-    fn click(&mut self, button: MouseButton, click_type: ClickType) -> Result<()>;
+pub trait InputBackend: Send {
+    fn click(&mut self, button: MouseButton) -> Result<()>;
 }
 
-pub struct Clicker {
-    backend: PlatformClicker,
-    delay_ms: u64,
+pub struct InputHandler {
+    backend: PlatformInput,
 }
 
-impl Clicker {
-    pub fn new(delay_ms: u64) -> Result<Self> {
+impl InputHandler {
+    pub fn new() -> Result<Self> {
         Ok(Self {
-            backend: PlatformClicker::new()?,
-            delay_ms,
+            backend: PlatformInput::new()?,
         })
     }
 
-    pub fn click(&mut self, button: MouseButton, click_type: ClickType) -> Result<()> {
-        self.backend.click(button, click_type)
-    }
-
-    pub fn set_delay(&mut self, delay_ms: u64) {
-        self.delay_ms = delay_ms;
+    pub fn click(&mut self, button: MouseButton, click_action: ClickAction) -> Result<()> {
+        match click_action {
+            ClickAction::Single => {
+                self.backend.click(button)?;
+            }
+            ClickAction::Double => {
+                self.backend.click(button)?;
+                std::thread::sleep(Duration::from_millis(50));
+                self.backend.click(button)?;
+            }
+        }
+        Ok(())
     }
 }

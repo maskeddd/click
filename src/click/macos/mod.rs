@@ -1,6 +1,6 @@
 mod accessibility;
 
-use super::{ClickType, ClickerBackend, MouseButton};
+use super::{InputBackend, MouseButton};
 use anyhow::Result;
 use objc2_app_kit::NSEvent;
 use objc2_core_foundation::{CFRetained, CGPoint};
@@ -9,14 +9,14 @@ use objc2_core_graphics::{
     CGEventType, CGMainDisplayID, CGMouseButton,
 };
 
-pub struct PlatformClicker {
+pub struct PlatformInput {
     source: Option<CFRetained<CGEventSource>>,
     display_height: f64,
 }
 
-unsafe impl Send for PlatformClicker {}
+unsafe impl Send for PlatformInput {}
 
-impl PlatformClicker {
+impl PlatformInput {
     pub fn new() -> Result<Self> {
         accessibility::ensure_trust();
 
@@ -43,28 +43,28 @@ impl PlatformClicker {
             MouseButton::Middle => (CGEventType::OtherMouseDown, CGEventType::OtherMouseUp),
         }
     }
-}
 
-impl ClickerBackend for PlatformClicker {
-    fn click(&mut self, button: MouseButton, click_type: ClickType) -> Result<()> {
+    fn get_mouse_position(&self) -> CGPoint {
         let pos = NSEvent::mouseLocation();
-        let cg_button = Self::mouse_button_to_cg(button);
-        let (down_type, up_type) = Self::get_event_types(button);
 
-        let flipped = CGPoint {
+        CGPoint {
             x: pos.x,
             y: self.display_height - pos.y,
-        };
-
-        let source_ref = self.source.as_ref().map(|r| &**r);
-
-        // Use correct event types for the button
-        if let Some(down) = CGEvent::new_mouse_event(source_ref, down_type, flipped, cg_button) {
-            CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&*down));
         }
+    }
+}
 
-        if let Some(up) = CGEvent::new_mouse_event(source_ref, up_type, flipped, cg_button) {
-            CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&*up));
+impl InputBackend for PlatformInput {
+    fn click(&mut self, button: MouseButton) -> Result<()> {
+        let pos = self.get_mouse_position();
+        let cg_button = Self::mouse_button_to_cg(button);
+        let (down_type, up_type) = Self::get_event_types(button);
+        let source = self.source.as_deref();
+
+        for event_type in [down_type, up_type] {
+            if let Some(event) = CGEvent::new_mouse_event(source, event_type, pos, cg_button) {
+                CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&*event));
+            }
         }
 
         Ok(())

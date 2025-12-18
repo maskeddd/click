@@ -13,14 +13,14 @@ fn is_trusted() -> bool {
     let keys = &[unsafe { kAXTrustedCheckOptionPrompt }];
     let values = &[CFBoolean::new(true)];
     let options = CFDictionary::from_slices(keys, values);
-    unsafe { AXIsProcessTrustedWithOptions(Some(&options.as_opaque())) }
+    unsafe { AXIsProcessTrustedWithOptions(Some(options.as_opaque())) }
 }
 
 fn prompt_trust_dialog() {
     let key = unsafe { kAXTrustedCheckOptionPrompt };
     let value = CFBoolean::new(true);
     let options = CFDictionary::from_slices(&[key], &[value]);
-    unsafe { AXIsProcessTrustedWithOptions(Some(&options.as_opaque())) };
+    unsafe { AXIsProcessTrustedWithOptions(Some(options.as_opaque())) };
 }
 
 pub fn ensure_trust() {

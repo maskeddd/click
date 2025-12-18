@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::{ClickType, ClickerBackend, MouseButton};
+use super::{ClickAction, InputBackend, MouseButton};
 use anyhow::Result;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_MOUSE, MOUSE_EVENT_FLAGS, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
@@ -8,22 +8,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEINPUT, SendInput,
 };
 
-pub struct PlatformClicker;
+pub struct PlatformInput;
 
-impl PlatformClicker {
+impl PlatformInput {
     pub fn new() -> Result<Self> {
         Ok(Self)
-    }
-
-    fn emit_click(&mut self, button: MouseButton) {
-        let (flag_down, flag_up) = self.button_to_flags(button);
-
-        let input_down = self.create_mouse_input(flag_down);
-        let input_up = self.create_mouse_input(flag_up);
-
-        unsafe {
-            SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
-        }
     }
 
     fn create_mouse_input(&self, flag: MOUSE_EVENT_FLAGS) -> INPUT {
@@ -51,18 +40,17 @@ impl PlatformClicker {
     }
 }
 
-impl ClickerBackend for PlatformClicker {
-    fn click(&mut self, button: MouseButton, click_type: ClickType) -> Result<()> {
-        match click_type {
-            ClickType::Single => {
-                self.emit_click(button);
-            }
-            ClickType::Double => {
-                self.emit_click(button);
-                std::thread::sleep(Duration::from_millis(40));
-                self.emit_click(button);
-            }
+impl InputBackend for PlatformInput {
+    fn click(&mut self, button: MouseButton) -> Result<()> {
+        let (flag_down, flag_up) = self.button_to_flags(button);
+
+        let input_down = self.create_mouse_input(flag_down);
+        let input_up = self.create_mouse_input(flag_up);
+
+        unsafe {
+            SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
         }
+
         Ok(())
     }
 }
