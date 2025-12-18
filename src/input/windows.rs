@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use super::{ClickAction, InputBackend, MouseButton};
+use super::{InputBackend, MouseButton};
 use anyhow::Result;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_MOUSE, MOUSE_EVENT_FLAGS, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
@@ -12,10 +10,15 @@ pub struct PlatformInput;
 
 impl PlatformInput {
     pub fn new() -> Result<Self> {
+        // lower timer resolution
+        unsafe {
+            windows::Win32::Media::timeBeginPeriod(1);
+        }
+
         Ok(Self)
     }
 
-    fn create_mouse_input(&self, flag: MOUSE_EVENT_FLAGS) -> INPUT {
+    fn create_mouse_input(flag: MOUSE_EVENT_FLAGS) -> INPUT {
         INPUT {
             r#type: INPUT_MOUSE,
             Anonymous: INPUT_0 {
@@ -31,7 +34,7 @@ impl PlatformInput {
         }
     }
 
-    fn button_to_flags(&self, button: MouseButton) -> (MOUSE_EVENT_FLAGS, MOUSE_EVENT_FLAGS) {
+    fn button_to_flags(button: MouseButton) -> (MOUSE_EVENT_FLAGS, MOUSE_EVENT_FLAGS) {
         match button {
             MouseButton::Left => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
             MouseButton::Right => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
@@ -42,13 +45,15 @@ impl PlatformInput {
 
 impl InputBackend for PlatformInput {
     fn click(&mut self, button: MouseButton) -> Result<()> {
-        let (flag_down, flag_up) = self.button_to_flags(button);
+        let (flag_down, flag_up) = Self::button_to_flags(button);
 
-        let input_down = self.create_mouse_input(flag_down);
-        let input_up = self.create_mouse_input(flag_up);
+        let inputs = [
+            Self::create_mouse_input(flag_down),
+            Self::create_mouse_input(flag_up),
+        ];
 
         unsafe {
-            SendInput(&[input_down, input_up], std::mem::size_of::<INPUT>() as i32);
+            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
         }
 
         Ok(())
