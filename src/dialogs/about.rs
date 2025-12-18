@@ -16,9 +16,8 @@ impl SimpleComponent for AboutDialog {
             .application_icon("lol.indent.click")
             .application_name("Click")
             .version("0.1.0")
-            .copyright("© 2025 maskeddd")
-            .developers(vec!["maskeddd"])
-            .designers(vec!["maskeddd"])
+            .copyright("© 2025 masked")
+            .developers(vec!["masked"])
             .build()
     }
 

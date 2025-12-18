@@ -4,21 +4,29 @@ use std::{
 };
 
 use gtk::prelude::*;
-use relm4::{JoinHandle, actions::RelmActionGroup, adw::prelude::*};
-use relm4::{actions::RelmAction, prelude::*};
+
+use relm4::{
+    JoinHandle,
+    actions::{AccelsPlus, RelmAction, RelmActionGroup},
+    adw::prelude::*,
+    prelude::*,
+};
+
 use relm4_components::simple_adw_combo_row::SimpleComboRow;
+
 use tracing::error;
 
 use crate::{
-    click::{ClickAction, InputHandler, MouseButton},
     dialogs::about::AboutDialog,
     icon_names,
+    input::{ClickAction, InputHandler, MouseButton},
     interval::ClickInterval,
 };
 
 const DEFAULT_WINDOW_WIDTH: i32 = 440;
 const DEFAULT_WINDOW_HEIGHT: i32 = 612;
 const MIN_CLICK_DELAY_MS: u64 = 5;
+const DEFAULT_TOGGLE_CLICKING_BIND: &str = "F6";
 
 #[derive(Debug)]
 pub enum IntervalField {
@@ -32,6 +40,7 @@ pub enum IntervalField {
 pub enum AppMsg {
     Start,
     Stop,
+    Toggle,
     MouseButtonChanged(usize),
     ClickActionChanged(usize),
     IntervalChanged(IntervalField),
@@ -62,7 +71,7 @@ impl AppModel {
         let delay = self.interval.total_milliseconds().max(MIN_CLICK_DELAY_MS);
         let button = self.mouse_button;
         let click_action = self.click_action;
-        let clicker = Arc::clone(input_handler);
+        let input_handler = Arc::clone(input_handler);
 
         self.is_running = true;
 
@@ -72,7 +81,7 @@ impl AppModel {
 
             loop {
                 interval.tick().await;
-                if let Err(e) = clicker.lock().unwrap().click(button, click_action) {
+                if let Err(e) = input_handler.lock().unwrap().click(button, click_action) {
                     error!("Click error: {}", e);
                     break;
                 }
@@ -97,6 +106,7 @@ impl AppModel {
 
 relm4::new_action_group!(pub(super) WindowActionGroup, "win");
 relm4::new_stateless_action!(AboutAction, WindowActionGroup, "about");
+relm4::new_stateless_action!(ToggleClickingAction, WindowActionGroup, "toggle_clicking");
 
 #[relm4::component(pub)]
 impl SimpleComponent for AppModel {
@@ -200,7 +210,7 @@ impl SimpleComponent for AppModel {
                             set_homogeneous: true,
 
                             gtk::Button {
-                                set_label: "Start",
+                                set_label: &format!("Start ({DEFAULT_TOGGLE_CLICKING_BIND})"),
                                 add_css_class: "pill",
                                 add_css_class: "suggested-action",
                                 #[watch]
@@ -209,7 +219,7 @@ impl SimpleComponent for AppModel {
                             },
 
                             gtk::Button {
-                                set_label: "Stop",
+                                set_label: &format!("Stop ({DEFAULT_TOGGLE_CLICKING_BIND})"),
                                 add_css_class: "pill",
                                 #[watch]
                                 set_sensitive: model.is_running,
@@ -227,6 +237,13 @@ impl SimpleComponent for AppModel {
         match msg {
             Start => self.start_clicking(),
             Stop => self.stop_clicking(),
+            Toggle => {
+                if self.is_running {
+                    self.stop_clicking();
+                } else {
+                    self.start_clicking();
+                }
+            }
             IntervalChanged(interval) => match interval {
                 IntervalField::Hours(v) => self.interval.hours = v as u8,
                 IntervalField::Minutes(v) => self.interval.minutes = v as u8,
@@ -284,6 +301,9 @@ impl SimpleComponent for AppModel {
 
         let widgets = view_output!();
 
+        let app = relm4::main_application();
+        app.set_accelerators_for_action::<ToggleClickingAction>(&[DEFAULT_TOGGLE_CLICKING_BIND]);
+
         let mut actions = RelmActionGroup::<WindowActionGroup>::new();
 
         let about_action = {
@@ -292,7 +312,15 @@ impl SimpleComponent for AppModel {
             })
         };
 
+        let toggle_action = {
+            let sender = sender.clone();
+            RelmAction::<ToggleClickingAction>::new_stateless(move |_| {
+                sender.input(AppMsg::Toggle);
+            })
+        };
+
         actions.add_action(about_action);
+        actions.add_action(toggle_action);
         actions.register_for_widget(&widgets.main_window);
 
         ComponentParts { model, widgets }
