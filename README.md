@@ -5,7 +5,7 @@
 A fast, cross-platform autoclicker built with Rust, GTK4, and libadwaita. Supports Windows, macOS, and Linux (X11/Wayland)
 
 ## Features
-* Very fast clicking (1,000+ CPS)
+* Very fast clicking (~1K CPS)
 * Adjustable interval
 * Configurable click action [Single/Double]
 * Configurable mouse button [Left/Right/Middle]
@@ -39,7 +39,7 @@ sudo pacman -S gtk4 libadwaita base-devel
 
 ### macOS
 * Install [rustup](https://rustup.rs/)
-* Install [homebrew](https://brew.sh/)
+* Install [Homebrew](https://brew.sh/)
 * Then run:
 ```bash
 brew install gtk4 libadwaita
