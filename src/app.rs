@@ -25,7 +25,7 @@ use crate::{
 
 const DEFAULT_WINDOW_WIDTH: i32 = 440;
 const DEFAULT_WINDOW_HEIGHT: i32 = 612;
-const MIN_CLICK_DELAY_MS: u64 = 5;
+const MIN_CLICK_DELAY_MS: u64 = 1;
 const DEFAULT_TOGGLE_CLICKING_BIND: &str = "F6";
 
 #[derive(Debug)]
