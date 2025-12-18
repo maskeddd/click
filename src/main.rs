@@ -1,6 +1,6 @@
 mod app;
-mod click;
 mod dialogs;
+mod input;
 mod interval;
 mod icon_names {
     pub use shipped::*;

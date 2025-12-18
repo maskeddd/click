@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
+cfg-if = "1.0.4"
 gtk = { package = "gtk4", version = "0.10.3" }
 relm4 = { version = "0.10.0", features = ["gnome_48", "libadwaita"] }
 relm4-components = { version = "0.10.0", features = ["libadwaita"] }

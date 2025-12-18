@@ -2,19 +2,20 @@ use std::{fmt, time::Duration};
 
 use anyhow::Result;
 
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(target_os = "windows")]
-mod windows;
-
-#[cfg(target_os = "linux")]
-pub use linux::PlatformInput;
-#[cfg(target_os = "macos")]
-pub use macos::PlatformInput;
-#[cfg(target_os = "windows")]
-pub use windows::PlatformInput;
+cfg_if::cfg_if! {
+    if #[cfg(target_os = "linux")] {
+        mod linux;
+        pub use linux::PlatformInput;
+    } else if #[cfg(target_os = "macos")] {
+        mod macos;
+        pub use macos::PlatformInput;
+    } else if #[cfg(target_os = "windows")] {
+        mod windows;
+        pub use windows::PlatformInput;
+    } else {
+        compile_error!("Unsupported operating system");
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MouseButton {

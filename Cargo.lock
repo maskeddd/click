@@ -103,6 +103,7 @@ name = "click"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cfg-if",
  "evdev",
  "gtk4",
  "objc2-app-kit",

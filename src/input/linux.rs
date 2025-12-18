@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use super::{ClickAction, InputBackend, MouseButton};
+use super::{InputBackend, MouseButton};
 use anyhow::Result;
 use evdev::{AttributeSet, EventType, InputEvent, KeyCode, uinput::VirtualDevice};
 
