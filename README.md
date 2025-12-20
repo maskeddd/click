@@ -69,8 +69,5 @@ The compiled binary can be found at `./target/release/click`
 - [ ] Hold clicks
 - [ ] A logo
 
-## Contributing
-Go for it.
-
 ## License
 MIT
