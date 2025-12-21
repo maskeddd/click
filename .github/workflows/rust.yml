@@ -28,10 +28,10 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-      - name: Install GTK4
+      - name: Install Dependencies
         run: |
           brew update
-          brew install gtk4
+          brew install gtk4 libadwaita
       - name: Build
         run: cargo build --verbose
 
