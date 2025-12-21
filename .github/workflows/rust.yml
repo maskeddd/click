@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   linux:
@@ -18,7 +18,7 @@ jobs:
           profile: minimal
           toolchain: stable
       - name: Build
-        run: cargo build --verbose
+        run: cargo build
 
   macos:
     runs-on: macos-latest
@@ -33,21 +33,26 @@ jobs:
           brew update
           brew install gtk4 libadwaita
       - name: Build
-        run: cargo build --verbose
+        run: cargo build
 
   windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: msys2/setup-msys2@v2
         with:
-          profile: minimal
-          toolchain: stable
-      - name: Install GTK4 via MSYS2
-        shell: bash
-        run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm mingw-w64-x86_64-gtk4
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gtk4
+            mingw-w64-x86_64-gettext
+            mingw-w64-x86_64-libxml2
+            mingw-w64-x86_64-librsvg
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-rust
       - name: Build
-        shell: bash
-        run: cargo build --verbose
+        run: cargo build
