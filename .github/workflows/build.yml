@@ -4,45 +4,47 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/gtk-rs/gtk4-rs/gtk4:latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build
-        run: cargo build
-        
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install Dependencies
-        run: |
-          brew update
-          brew install gtk4 libadwaita
-      - name: Build
-        run: cargo build
-        
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            container: ghcr.io/gtk-rs/gtk4-rs/gtk4:latest
+            install_deps: ""
+            artifact_ext: tar.gz
+            package_cmd: tar -czf
+          - os: macos-latest
+            container: null
+            install_deps: |
+              brew update
+              brew install gtk4 libadwaita
+            artifact_ext: zip
+            package_cmd: zip -r
+          - os: windows-latest
+            container: null
+            install_deps: msys2
+            artifact_ext: zip
+            package_cmd: zip -r
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     defaults:
       run:
-        shell: msys2 {0}
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: msys2/setup-msys2@v2
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
@@ -55,6 +57,52 @@ jobs:
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-rust
+            zip
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.os != 'windows-latest'
+
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install Dependencies
+        if: matrix.install_deps != '' && matrix.install_deps != 'msys2'
+        run: ${{ matrix.install_deps }}
+
       - name: Build
-        run: cargo build
+        run: cargo build --release
+
+      - name: Get target triple
+        id: target
+        run: echo "triple=$(rustc -vV | sed -n 's|host: ||p')" >> $GITHUB_OUTPUT
+
+      - name: Get binary name
+        id: binary
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            echo "name=click.exe" >> $GITHUB_OUTPUT
+          else
+            echo "name=click" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Package artifact
+        if: github.event_name == 'release'
+        env:
+          VERSION: ${{ github.ref_name }}
+          TARGET: ${{ steps.target.outputs.triple }}
+          BINARY: ${{ steps.binary.outputs.name }}
+          EXT: ${{ matrix.artifact_ext }}
+        run: |
+          mkdir -p dist
+          cp target/release/${BINARY} dist/${BINARY}
+          cd dist
+          if [ "$EXT" = "tar.gz" ]; then
+            tar -czf click-${VERSION}-${TARGET}.tar.gz ${BINARY}
+          else
+            zip click-${VERSION}-${TARGET}.zip ${BINARY}
+          fi
+
+      - name: Upload artifact
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/click-${{ github.ref_name }}-${{ steps.target.outputs.triple }}.${{ matrix.artifact_ext }}
