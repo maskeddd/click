@@ -73,7 +73,8 @@ jobs:
 
       - name: Get target triple
         id: target
-        run: echo "triple=$(rustc -vV | sed -n 's|host: ||p')" >> $GITHUB_OUTPUT
+        run: |
+          echo "triple=$(rustc -vV | sed -n 's|host: ||p')" >> $GITHUB_OUTPUT
 
       - name: Get binary name
         id: binary
