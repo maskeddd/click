@@ -2,7 +2,7 @@
     Click
 </h1>
 
-A fast, cross-platform autoclicker built with Rust, GTK4, and libadwaita. Supports Windows, macOS, and Linux (X11/Wayland)
+A fast, cross-platform autoclicker built with Rust, GTK4, and libadwaita. Supports Windows, macOS, and Linux (X11/Wayland).
 
 ## Features
 * Very fast clicking (~1K CPS)
@@ -67,7 +67,7 @@ The compiled binary can be found at `./target/release/click`
 - [ ] Randomized click interval
 - [ ] Clicking a set location
 - [ ] Hold clicks
-- [ ] A logo
+- [ ] Option to set CPS target
 
 ## License
 MIT
