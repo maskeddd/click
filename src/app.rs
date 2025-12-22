@@ -1,5 +1,5 @@
 use eframe::egui;
-use eframe::egui::{Vec2, Visuals};
+use eframe::egui::Vec2;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -92,7 +92,7 @@ impl ClickApp {
     fn calculate_interval(&self) -> Duration {
         match self.interval_mode {
             IntervalMode::Time => self.time_interval.to_duration(),
-            IntervalMode::CPS => {
+            IntervalMode::Cps => {
                 let cps = self.cps.max(1) as u64;
                 Duration::from_secs_f64(1.0 / cps as f64)
             }
@@ -215,7 +215,7 @@ impl ClickApp {
                 });
                 ui.end_row();
 
-                ui.radio_value(&mut self.interval_mode, IntervalMode::CPS, "Target CPS:");
+                ui.radio_value(&mut self.interval_mode, IntervalMode::Cps, "Target CPS:");
                 ui.add(
                     egui::DragValue::new(&mut self.cps)
                         .speed(0.1)

@@ -3,7 +3,7 @@ use std::time::Duration;
 #[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Copy)]
 pub enum IntervalMode {
     Time,
-    CPS,
+    Cps,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Copy)]
@@ -27,7 +27,7 @@ impl Default for TimeInterval {
 }
 
 impl TimeInterval {
-    pub fn to_duration(&self) -> Duration {
+    pub fn to_duration(self) -> Duration {
         let total_ms = (self.hours as u64) * 3600 * 1000
             + (self.minutes as u64) * 60 * 1000
             + (self.seconds as u64) * 1000
