@@ -7,9 +7,4 @@
       channel = "stable";
     };
   };
-
-  packages = with pkgs; [
-    gtk4
-    libadwaita
-  ];
 }

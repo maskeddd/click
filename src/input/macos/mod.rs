@@ -2,6 +2,7 @@ mod accessibility;
 
 use super::{InputBackend, MouseButton};
 use anyhow::Result;
+use objc2::rc::autoreleasepool;
 use objc2_app_kit::NSEvent;
 use objc2_core_foundation::{CFRetained, CGPoint};
 use objc2_core_graphics::{
@@ -61,11 +62,13 @@ impl InputBackend for PlatformInput {
         let (down_type, up_type) = Self::get_event_types(button);
         let source = self.source.as_deref();
 
-        for event_type in [down_type, up_type] {
-            if let Some(event) = CGEvent::new_mouse_event(source, event_type, pos, cg_button) {
-                CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&*event));
+        autoreleasepool(|_| {
+            for event_type in [down_type, up_type] {
+                if let Some(event) = CGEvent::new_mouse_event(source, event_type, pos, cg_button) {
+                    CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&*event));
+                }
             }
-        }
+        });
 
         Ok(())
     }

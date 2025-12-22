@@ -17,7 +17,7 @@ cfg_if::cfg_if! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum MouseButton {
     Left,
     Right,
@@ -34,7 +34,13 @@ impl fmt::Display for MouseButton {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+impl MouseButton {
+    pub fn all() -> [MouseButton; 3] {
+        [MouseButton::Left, MouseButton::Right, MouseButton::Middle]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
 pub enum ClickAction {
     Single,
     Double,
@@ -46,6 +52,12 @@ impl fmt::Display for ClickAction {
             ClickAction::Single => write!(f, "Single"),
             ClickAction::Double => write!(f, "Double"),
         }
+    }
+}
+
+impl ClickAction {
+    pub fn all() -> [ClickAction; 2] {
+        [ClickAction::Single, ClickAction::Double]
     }
 }
 

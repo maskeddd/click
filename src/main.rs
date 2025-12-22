@@ -1,19 +1,16 @@
-mod app;
-mod dialogs;
-mod input;
-mod interval;
-mod icon_names {
-    pub use shipped::*;
-    include!(concat!(env!("OUT_DIR"), "/icon_names.rs"));
-}
+use eframe::egui;
 
-use crate::app::AppModel;
-use relm4::RelmApp;
-
-fn main() {
-    tracing_subscriber::fmt::init();
-
-    relm4_icons::initialize_icons(icon_names::GRESOURCE_BYTES, icon_names::RESOURCE_PREFIX);
-    let app = RelmApp::new("lol.indent.click");
-    app.run::<AppModel>(());
+fn main() -> eframe::Result {
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_resizable(false)
+            .with_inner_size([1.0, 1.0]),
+        persist_window: false,
+        ..Default::default()
+    };
+    eframe::run_native(
+        "Click",
+        native_options,
+        Box::new(|cc| Ok(Box::new(click::ClickApp::new(cc)))),
+    )
 }
