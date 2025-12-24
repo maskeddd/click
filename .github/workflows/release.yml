@@ -1,14 +1,9 @@
-name: 'publish'
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
   release:
     types: [created]
 
 jobs:
-  publish-package:
+  release:
     permissions:
       contents: write
     strategy:
@@ -54,10 +49,8 @@ jobs:
           name: packages-${{ matrix.name }}
           path: dist/*
       
-      - name: Create Release
+      - name: Create release
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'release'
         with:
           files: dist/*
-          draft: true
-          prerelease: false
