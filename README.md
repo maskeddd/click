@@ -2,7 +2,7 @@
     Click
 </h1>
 
-A fast, cross‑platform autoclicker built with Rust and **egui**. Supports Windows, macOS, and Linux (X11/Wayland).
+A fast, cross‑platform autoclicker built with Rust and egui. Supports Windows, macOS, and Linux (X11/Wayland).
 
 ## Features
 * Very fast clicking (~1K CPS)
@@ -21,7 +21,7 @@ TODO
 
 ---
 
-### Linux / macOS / Windows
+### Build & Run
 ```bash
 git clone https://github.com/maskeddd/click.git
 cd click
