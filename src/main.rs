@@ -7,6 +7,7 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default()
             .with_resizable(false)
             .with_maximize_button(false)
+            .with_always_on_top()
             .with_inner_size([400.0, 250.0])
             .with_min_inner_size([400.0, 250.0])
             .with_max_inner_size([400.0, 250.0]),
