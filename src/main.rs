@@ -1,16 +1,27 @@
-use eframe::egui;
+use eframe::egui::{self, TextWrapMode};
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_resizable(false)
-            .with_inner_size([1.0, 1.0]),
+            .with_inner_size([400.0, 250.0])
+            .with_min_inner_size([400.0, 250.0])
+            .with_max_inner_size([400.0, 250.0]),
         persist_window: false,
         ..Default::default()
     };
+
     eframe::run_native(
         "Click",
         native_options,
-        Box::new(|cc| Ok(Box::new(click::ClickApp::new(cc)))),
+        Box::new(|cc| {
+            cc.egui_ctx.all_styles_mut(|style| {
+                style.wrap_mode = Some(TextWrapMode::Extend);
+            });
+            cc.egui_ctx.options_mut(|options| {
+                options.max_passes = std::num::NonZeroUsize::new(2).unwrap();
+            });
+            Ok(Box::new(click::ClickApp::new(cc)))
+        }),
     )
 }
