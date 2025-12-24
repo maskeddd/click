@@ -42,10 +42,7 @@ jobs:
 
       - name: Package
         run: cargo packager --release
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
+        
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

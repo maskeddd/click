@@ -7,14 +7,9 @@ edition = "2024"
 name = "click"
 product-name = "Click"
 identifier = "lol.indent.click"
-
 icons = ["32x32.png"]
-
 before-packaging-command = "cargo build --release"
 out-dir = "./dist"
-
-[package.metadata.packager.macos]
-signing-identity = "-"
 
 [dependencies]
 anyhow = "1.0.100"
