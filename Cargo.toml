@@ -9,7 +9,6 @@ name = "click"
 product_name = "Click"
 identifier = "lol.indent.click"
 icons = ["32x32.png"]
-formats = ["deb", "pacman", "appimage", "nsis", "dmg"]
 out-dir = "./dist"
 
 [dependencies]
