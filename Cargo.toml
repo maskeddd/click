@@ -3,6 +3,15 @@ name = "click"
 version = "0.1.0"
 edition = "2024"
 
+[package.metadata.packager]
+before-packaging-command = "cargo build --release"
+name = "click"
+product_name = "Click"
+identifier = "lol.indent.click"
+icons = ["32x32.png"]
+formats = ["deb", "pacman", "appimage", "nsis", "dmg"]
+out-dir = "./dist"
+
 [dependencies]
 anyhow = "1.0.100"
 cfg-if = "1.0.4"

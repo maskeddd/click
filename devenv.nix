@@ -1,5 +1,20 @@
 { pkgs, lib, ... }:
 
+let
+  cargo-packager = pkgs.rustPlatform.buildRustPackage rec {
+    pname = "cargo-packager";
+    version = "0.11.8";
+
+    src = pkgs.fetchCrate {
+      inherit pname version;
+      sha256 = "sha256-DjqrsomwtM5JzGrBIjfREZ15pUijza+/p+3CwXe+dSY=";
+    };
+
+    cargoLock = {
+      lockFile = "${src}/Cargo.lock";
+    };
+  };
+in
 {
   languages = {
     rust = {
@@ -8,7 +23,10 @@
     };
   };
 
-  packages = lib.optionals pkgs.stdenv.isLinux (
+  packages = [
+    cargo-packager
+  ]
+  ++ lib.optionals pkgs.stdenv.isLinux (
     with pkgs;
     [
       libxkbcommon
