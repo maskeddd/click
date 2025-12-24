@@ -1,13 +1,12 @@
-# Click
+<h1 align="center">
+  Click
+</h1>
 
-A fast, cross‑platform autoclicker built with Rust and egui.  
-Supports Windows, macOS, and Linux (X11/Wayland).
+A fast, cross‑platform autoclicker built with Rust and egui. Supports Windows, macOS, and Linux (X11/Wayland).
 
 <p align="center">
-  <img src="./assets/screenshot.png" alt="Click app screenshot" width="600">
+  <img src="./assets/screenshot.png" alt="Click app screenshot" width="100%">
 </p>
-
----
 
 ## Features
 
@@ -16,13 +15,9 @@ Supports Windows, macOS, and Linux (X11/Wayland).
 - Configurable click action (Single / Double)
 - Configurable mouse button (Left / Right / Middle)
 
----
-
 ## Installation
 
 You can download the latest release for your platform [here](https://github.com/maskeddd/click/releases).
-
----
 
 ## Building
 
@@ -40,16 +35,12 @@ cargo build --release
 
 The compiled binary will be located at: `./target/release/click`
 
----
-
 ## Roadmap
 
 - [ ] Customizable global hotkey
 - [ ] Randomized click interval
 - [ ] Clicking a set location
 - [ ] Hold clicks
-
----
 
 ## License
 
