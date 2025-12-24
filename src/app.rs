@@ -1,5 +1,4 @@
 use eframe::egui;
-use eframe::egui::Vec2;
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -19,24 +18,12 @@ pub struct ClickApp {
     interval_mode: IntervalMode,
     mouse_button: MouseButton,
     click_type: ClickAction,
-
     time_interval: TimeInterval,
     cps: u16,
 
     #[serde(skip)]
     #[serde(default)]
     clicker: ClickerState,
-
-    #[serde(skip)]
-    render_stage: Stage,
-}
-
-#[derive(Clone, Copy)]
-enum Stage {
-    PreRender(isize),
-    FirstRender(Vec2),
-    FirstResize(Vec2),
-    Initialized(Vec2),
 }
 
 struct ClickerState {
@@ -75,7 +62,6 @@ impl Default for ClickApp {
             cps: 20,
             time_interval: TimeInterval::default(),
             clicker: ClickerState::default(),
-            render_stage: Stage::PreRender(2),
         }
     }
 }
@@ -139,9 +125,7 @@ impl ClickApp {
                             }
                         }
                     }
-                    _ = stop_rx.recv() => {
-                        break;
-                    }
+                    _ = stop_rx.recv() => break,
                 }
             }
         });
@@ -163,141 +147,6 @@ impl ClickApp {
         self.clicker.task_handle = None;
         self.clicker.is_running = false;
     }
-
-    // ======= UI Drawing helpers =======
-
-    fn show_top_menu(&self, ctx: &egui::Context, ui: &mut egui::Ui) {
-        egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("File", |ui| {
-                if ui.button("Quit").clicked() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-            });
-            ui.add_space(16.0);
-        });
-    }
-
-    fn show_interval_settings(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new("interval_grid")
-            .num_columns(2)
-            .spacing([10.0, 4.0])
-            .show(ui, |ui| {
-                ui.radio_value(&mut self.interval_mode, IntervalMode::Time, "Time:");
-                ui.horizontal(|ui| {
-                    ui.label("H:");
-                    ui.add(
-                        egui::DragValue::new(&mut self.time_interval.hours)
-                            .speed(0.1)
-                            .range(0..=23)
-                            .max_decimals(0),
-                    );
-                    ui.label("M:");
-                    ui.add(
-                        egui::DragValue::new(&mut self.time_interval.minutes)
-                            .speed(0.1)
-                            .range(0..=59)
-                            .max_decimals(0),
-                    );
-                    ui.label("S:");
-                    ui.add(
-                        egui::DragValue::new(&mut self.time_interval.seconds)
-                            .speed(0.1)
-                            .range(0..=59)
-                            .max_decimals(0),
-                    );
-                    ui.label("MS:");
-                    ui.add(
-                        egui::DragValue::new(&mut self.time_interval.milliseconds)
-                            .speed(1.0)
-                            .range(0..=999)
-                            .max_decimals(0),
-                    );
-                });
-                ui.end_row();
-
-                ui.radio_value(&mut self.interval_mode, IntervalMode::Cps, "Target CPS:");
-                ui.add(
-                    egui::DragValue::new(&mut self.cps)
-                        .speed(0.1)
-                        .range(0..=1000)
-                        .max_decimals(0),
-                );
-                ui.end_row();
-            });
-    }
-
-    fn show_input_settings(&mut self, ui: &mut egui::Ui) {
-        egui::Grid::new("input_grid")
-            .num_columns(2)
-            .spacing([10.0, 4.0])
-            .show(ui, |ui| {
-                ui.label("Mouse Button:");
-                egui::ComboBox::from_id_salt("mouse_button_combo")
-                    .selected_text(self.mouse_button.to_string())
-                    .show_ui(ui, |ui| {
-                        for variant in MouseButton::all() {
-                            ui.selectable_value(
-                                &mut self.mouse_button,
-                                variant,
-                                variant.to_string(),
-                            );
-                        }
-                    });
-                ui.end_row();
-
-                ui.label("Click Type:");
-                egui::ComboBox::from_id_salt("click_type_combo")
-                    .selected_text(self.click_type.to_string())
-                    .show_ui(ui, |ui| {
-                        for variant in ClickAction::all() {
-                            ui.selectable_value(&mut self.click_type, variant, variant.to_string());
-                        }
-                    });
-                ui.end_row();
-            });
-    }
-
-    fn show_control_buttons(&mut self, ui: &mut egui::Ui) {
-        ui.columns_const(|[left, right]| {
-            left.add_enabled_ui(!self.clicker.is_running, |ui| {
-                if ui
-                    .add_sized([0.0, 36.0], egui::Button::new("Start"))
-                    .clicked()
-                {
-                    self.start_clicker();
-                }
-            });
-
-            right.add_enabled_ui(self.clicker.is_running, |ui| {
-                if ui
-                    .add_sized([0.0, 36.0], egui::Button::new("Stop"))
-                    .clicked()
-                {
-                    self.stop_clicker();
-                }
-            });
-        });
-    }
-
-    fn render_ui(&mut self, ctx: &egui::Context) {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            self.show_top_menu(ctx, ui);
-        });
-
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.show_interval_settings(ui);
-
-            ui.add(egui::Separator::default().spacing(18.0));
-
-            self.show_input_settings(ui);
-
-            ui.add(egui::Separator::default().spacing(18.0));
-
-            self.show_control_buttons(ui);
-
-            egui::warn_if_debug_build(ui);
-        });
-    }
 }
 
 impl Drop for ClickApp {
@@ -314,27 +163,129 @@ impl eframe::App for ClickApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        match self.render_stage {
-            Stage::PreRender(mut count) => {
-                self.render_ui(ctx);
-                count -= 1;
-                if count > 0 {
-                    self.render_stage = Stage::PreRender(count);
-                } else {
-                    self.render_stage = Stage::FirstRender(ctx.used_size());
-                }
-            }
-            Stage::FirstRender(size) => {
-                self.render_ui(ctx);
-                self.render_stage = Stage::FirstResize(size);
-            }
-            Stage::FirstResize(size) => {
-                ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(size));
-                self.render_stage = Stage::Initialized(size);
-            }
-            Stage::Initialized(_size) => {
-                self.render_ui(ctx);
-            }
-        }
+        egui::TopBottomPanel::bottom("bottom_panel")
+            .frame(
+                egui::Frame::default()
+                    .fill(egui::Color32::from_rgb(26, 26, 26))
+                    .inner_margin(egui::Margin {
+                        left: 12,
+                        right: 12,
+                        top: 12,
+                        bottom: 12,
+                    }),
+            )
+            .show(ctx, |ui| {
+                ui.columns_const(|[left, right]| {
+                    left.add_enabled_ui(!self.clicker.is_running, |ui| {
+                        if ui
+                            .add_sized([0.0, 36.0], egui::Button::new("Start"))
+                            .clicked()
+                        {
+                            self.start_clicker();
+                        }
+                    });
+
+                    right.add_enabled_ui(self.clicker.is_running, |ui| {
+                        if ui
+                            .add_sized([0.0, 36.0], egui::Button::new("Stop"))
+                            .clicked()
+                        {
+                            self.stop_clicker();
+                        }
+                    });
+                });
+
+                egui::warn_if_debug_build(ui);
+            });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Interval");
+            ui.add_space(6.0);
+
+            egui::Grid::new("interval_grid")
+                .num_columns(2)
+                .spacing([10.0, 4.0])
+                .show(ui, |ui| {
+                    ui.radio_value(&mut self.interval_mode, IntervalMode::Time, "Time:");
+                    ui.horizontal(|ui| {
+                        ui.label("H:");
+                        ui.add(
+                            egui::DragValue::new(&mut self.time_interval.hours)
+                                .speed(0.1)
+                                .range(0..=23)
+                                .max_decimals(0),
+                        );
+                        ui.label("M:");
+                        ui.add(
+                            egui::DragValue::new(&mut self.time_interval.minutes)
+                                .speed(0.1)
+                                .range(0..=59)
+                                .max_decimals(0),
+                        );
+                        ui.label("S:");
+                        ui.add(
+                            egui::DragValue::new(&mut self.time_interval.seconds)
+                                .speed(0.1)
+                                .range(0..=59)
+                                .max_decimals(0),
+                        );
+                        ui.label("MS:");
+                        ui.add(
+                            egui::DragValue::new(&mut self.time_interval.milliseconds)
+                                .speed(1.0)
+                                .range(0..=999)
+                                .max_decimals(0),
+                        );
+                    });
+                    ui.end_row();
+
+                    ui.radio_value(&mut self.interval_mode, IntervalMode::Cps, "Target CPS:");
+                    ui.add(
+                        egui::DragValue::new(&mut self.cps)
+                            .speed(0.1)
+                            .range(0..=1000)
+                            .max_decimals(0),
+                    );
+                    ui.end_row();
+                });
+
+            ui.add(egui::Separator::default().spacing(18.0));
+
+            ui.heading("Input");
+            ui.add_space(6.0);
+
+            egui::Grid::new("input_grid")
+                .num_columns(2)
+                .spacing([10.0, 4.0])
+                .show(ui, |ui| {
+                    ui.label("Mouse Button:");
+                    egui::ComboBox::from_id_salt("mouse_button_combo")
+                        .selected_text(self.mouse_button.to_string())
+                        .show_ui(ui, |ui| {
+                            for variant in MouseButton::all() {
+                                ui.selectable_value(
+                                    &mut self.mouse_button,
+                                    variant,
+                                    variant.to_string(),
+                                );
+                            }
+                        });
+                    ui.end_row();
+
+                    ui.label("Click Type:");
+                    egui::ComboBox::from_id_salt("click_type_combo")
+                        .selected_text(self.click_type.to_string())
+                        .show_ui(ui, |ui| {
+                            for variant in ClickAction::all() {
+                                ui.selectable_value(
+                                    &mut self.click_type,
+                                    variant,
+                                    variant.to_string(),
+                                );
+                            }
+                        });
+                    ui.end_row();
+                });
+        });
     }
 }
