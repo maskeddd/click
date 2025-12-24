@@ -1,9 +1,12 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use eframe::egui::{self, TextWrapMode};
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_resizable(false)
+            .with_maximize_button(false)
             .with_inner_size([400.0, 250.0])
             .with_min_inner_size([400.0, 250.0])
             .with_max_inner_size([400.0, 250.0]),
