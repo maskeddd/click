@@ -7,32 +7,44 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      flake-utils,
+      ...
+    }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
       in
-      with pkgs; {
+      with pkgs;
+      {
         devShells.default = mkShell rec {
-          buildInputs =
-            [
-              rust-bin.stable.latest.default
+          buildInputs = [
+            (rust-bin.stable.latest.default.override {
+              extensions = [
+                "rust-analyzer"
+                "rust-src"
+              ];
+            })
 
-              openssl
-              pkg-config
-            ]
-            ++ lib.optionals stdenv.isLinux [
-              libxkbcommon
-              libGL
-              fontconfig
-              wayland
-              xorg.libXcursor
-              xorg.libXrandr
-              xorg.libXi
-              xorg.libX11
-            ];
+            openssl
+            pkg-config
+          ]
+          ++ lib.optionals stdenv.isLinux [
+            libxkbcommon
+            libGL
+            fontconfig
+            wayland
+            xorg.libXcursor
+            xorg.libXrandr
+            xorg.libXi
+            xorg.libX11
+          ];
 
           LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
         };
