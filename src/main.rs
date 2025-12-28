@@ -1,16 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::egui::{self, TextWrapMode};
+use eframe::egui::{self, TextWrapMode, Vec2};
 
 fn main() -> eframe::Result {
+    let size = Vec2::new(420.0, 274.0);
+
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_resizable(false)
             .with_maximize_button(false)
             .with_always_on_top()
-            .with_inner_size([400.0, 250.0])
-            .with_min_inner_size([400.0, 250.0])
-            .with_max_inner_size([400.0, 250.0]),
+            .with_inner_size(size)
+            .with_min_inner_size(size)
+            .with_max_inner_size(size),
         persist_window: false,
         ..Default::default()
     };
