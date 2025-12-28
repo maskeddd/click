@@ -14,6 +14,7 @@ A fast, cross‑platform autoclicker built with Rust and egui. Supports Windows,
 - Adjustable interval
 - Configurable click action (Single / Double)
 - Configurable mouse button (Left / Right / Middle)
+- Humanized random delay
 
 ## Installation
 
@@ -38,7 +39,6 @@ The compiled binary will be located at: `./target/release/click`
 ## Roadmap
 
 - [ ] Customizable global hotkey
-- [ ] Randomized click interval
 - [ ] Clicking a set location
 - [ ] Hold clicks
 

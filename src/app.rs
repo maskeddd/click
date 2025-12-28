@@ -9,17 +9,20 @@ use tracing::error;
 use crate::{
     InputHandler,
     input::{ClickAction, MouseButton},
-    interval::{IntervalMode, TimeInterval},
+    interval::{IntervalMode, Jitter, TimeInterval},
 };
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct ClickApp {
     interval_mode: IntervalMode,
-    mouse_button: MouseButton,
-    click_type: ClickAction,
     time_interval: TimeInterval,
     cps: u16,
+    jitter: u16,
+    use_jitter: bool,
+
+    mouse_button: MouseButton,
+    click_type: ClickAction,
 
     #[serde(skip)]
     #[serde(default)]
@@ -57,10 +60,12 @@ impl Default for ClickApp {
     fn default() -> Self {
         Self {
             interval_mode: IntervalMode::Time,
+            time_interval: TimeInterval::default(),
+            cps: 20,
+            jitter: 0,
+            use_jitter: false,
             mouse_button: MouseButton::Left,
             click_type: ClickAction::Single,
-            cps: 20,
-            time_interval: TimeInterval::default(),
             clicker: ClickerState::default(),
         }
     }
@@ -99,33 +104,57 @@ impl ClickApp {
         };
 
         let (stop_tx, mut stop_rx) = tokio::sync::mpsc::channel::<()>(1);
-        let interval_duration = self.calculate_interval();
+        let base_interval = self.calculate_interval();
         let mouse_button = self.mouse_button;
         let click_action = self.click_type;
+        let use_jitter = self.use_jitter;
+        let jitter = self.jitter;
+
+        let mut human_jitter = Jitter::new();
 
         let handle = self.clicker.runtime.spawn(async move {
-            let mut interval = tokio::time::interval(interval_duration);
+            // Create initial interval with base duration
+            let mut interval = tokio::time::interval(base_interval);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
+            // Skip the first immediate tick
             interval.tick().await;
 
             loop {
+                // Compute humanized jittered interval
+                let current_interval = if use_jitter && jitter > 0 {
+                    human_jitter.next(base_interval, jitter)
+                } else {
+                    base_interval
+                };
+
+                // Recreate interval if the duration changed significantly
+                // (only needed when jitter is in use)
+                if use_jitter && jitter > 0 {
+                    interval = tokio::time::interval(current_interval);
+                    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    interval.tick().await;
+                }
+
                 tokio::select! {
                     _ = interval.tick() => {
-                        match input_handler.lock() {
-                            Ok(mut handler) => {
-                                if let Err(e) = handler.click(mouse_button, click_action) {
-                                    error!("Click failed: {}", e);
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                error!("Failed to acquire lock: {}", e);
-                                break;
-                            }
+                        let click_result = input_handler
+                            .lock()
+                            .map_err(|e| format!("Lock error: {e}"))
+                            .and_then(|mut handler| {
+                                handler
+                                    .click(mouse_button, click_action)
+                                    .map_err(|e| format!("Click failed: {e}"))
+                            });
+
+                        if let Err(e) = click_result {
+                            error!("{e}");
+                            break;
                         }
                     }
-                    _ = stop_rx.recv() => break,
+                    _ = stop_rx.recv() => {
+                        break;
+                    }
                 }
             }
         });
@@ -207,58 +236,78 @@ impl eframe::App for ClickApp {
                 .spacing([10.0, 4.0])
                 .show(ui, |ui| {
                     ui.radio_value(&mut self.interval_mode, IntervalMode::Time, "Time:");
-                    ui.horizontal(|ui| {
-                        ui.label("H:");
+                    ui.add_enabled_ui(self.interval_mode == IntervalMode::Time, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("H:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.time_interval.hours)
+                                    .speed(0.1)
+                                    .range(0..=23)
+                                    .max_decimals(0),
+                            );
+
+                            ui.label("M:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.time_interval.minutes)
+                                    .speed(0.1)
+                                    .range(0..=59)
+                                    .max_decimals(0),
+                            );
+
+                            ui.label("S:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.time_interval.seconds)
+                                    .speed(0.1)
+                                    .range(0..=59)
+                                    .max_decimals(0),
+                            );
+
+                            ui.label("MS:");
+                            ui.add(
+                                egui::DragValue::new(&mut self.time_interval.milliseconds)
+                                    .speed(1.0)
+                                    .range(0..=999)
+                                    .max_decimals(0),
+                            );
+                        });
+                    });
+                    ui.end_row();
+
+                    ui.radio_value(&mut self.interval_mode, IntervalMode::Cps, "Target CPS:");
+                    ui.add_enabled_ui(self.interval_mode == IntervalMode::Cps, |ui| {
                         ui.add(
-                            egui::DragValue::new(&mut self.time_interval.hours)
+                            egui::DragValue::new(&mut self.cps)
                                 .speed(0.1)
-                                .range(0..=23)
-                                .max_decimals(0),
-                        );
-                        ui.label("M:");
-                        ui.add(
-                            egui::DragValue::new(&mut self.time_interval.minutes)
-                                .speed(0.1)
-                                .range(0..=59)
-                                .max_decimals(0),
-                        );
-                        ui.label("S:");
-                        ui.add(
-                            egui::DragValue::new(&mut self.time_interval.seconds)
-                                .speed(0.1)
-                                .range(0..=59)
-                                .max_decimals(0),
-                        );
-                        ui.label("MS:");
-                        ui.add(
-                            egui::DragValue::new(&mut self.time_interval.milliseconds)
-                                .speed(1.0)
-                                .range(0..=999)
+                                .range(0..=1000)
                                 .max_decimals(0),
                         );
                     });
                     ui.end_row();
 
-                    ui.radio_value(&mut self.interval_mode, IntervalMode::Cps, "Target CPS:");
-                    ui.add(
-                        egui::DragValue::new(&mut self.cps)
-                            .speed(0.1)
-                            .range(0..=1000)
-                            .max_decimals(0),
-                    );
+                    ui.checkbox(&mut self.use_jitter, "Random delay: ");
+                    ui.add_enabled_ui(self.use_jitter, |ui| {
+                        ui.add(
+                            egui::DragValue::new(&mut self.jitter)
+                                .speed(0.1)
+                                .range(0..=1000)
+                                .max_decimals(0)
+                                .prefix("± ")
+                                .suffix(" ms"),
+                        );
+                    });
                     ui.end_row();
                 });
 
             ui.add(egui::Separator::default().spacing(18.0));
 
-            ui.heading("Input");
+            ui.heading("Behavior");
             ui.add_space(6.0);
 
             egui::Grid::new("input_grid")
                 .num_columns(2)
                 .spacing([10.0, 4.0])
                 .show(ui, |ui| {
-                    ui.label("Mouse Button:");
+                    ui.label("Mouse button:");
                     egui::ComboBox::from_id_salt("mouse_button_combo")
                         .selected_text(self.mouse_button.to_string())
                         .show_ui(ui, |ui| {
@@ -272,7 +321,7 @@ impl eframe::App for ClickApp {
                         });
                     ui.end_row();
 
-                    ui.label("Click Type:");
+                    ui.label("Click type:");
                     egui::ComboBox::from_id_salt("click_type_combo")
                         .selected_text(self.click_type.to_string())
                         .show_ui(ui, |ui| {

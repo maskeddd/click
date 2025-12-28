@@ -1,5 +1,8 @@
 use std::time::Duration;
 
+use rand::Rng;
+use rand_distr::{Distribution, Gamma, Normal};
+
 #[derive(PartialEq, serde::Deserialize, serde::Serialize, Clone, Copy)]
 pub enum IntervalMode {
     Time,
@@ -33,5 +36,40 @@ impl TimeInterval {
             + (self.seconds as u64) * 1000
             + (self.milliseconds as u64);
         Duration::from_millis(total_ms.max(1))
+    }
+}
+
+pub struct Jitter {
+    last_offset: f64,
+    click_count: u32,
+}
+
+impl Jitter {
+    pub fn new() -> Self {
+        Self {
+            last_offset: 0.0,
+            click_count: 0,
+        }
+    }
+
+    pub fn next(&mut self, base: Duration, jitter: u16) -> Duration {
+        let base_ms = base.as_millis() as f64;
+        let mut rng = rand::rng();
+
+        let normal = Normal::new(0.0, jitter as f64 / 3.0).unwrap();
+        let quick_jitter = normal.sample(&mut rng);
+
+        let hesitation = if rng.random::<f64>() < 0.03 {
+            let gamma = Gamma::new(2.0, jitter as f64 * 0.5).unwrap();
+            gamma.sample(&mut rng)
+        } else {
+            0.0
+        };
+
+        self.last_offset = (self.last_offset * 0.85) + (quick_jitter * 0.15);
+
+        let final_ms = (base_ms + self.last_offset + hesitation).max(1.0);
+        self.click_count += 1;
+        Duration::from_millis(final_ms.round() as u64)
     }
 }
