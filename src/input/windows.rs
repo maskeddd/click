@@ -10,7 +10,7 @@ pub struct PlatformInput;
 
 impl PlatformInput {
     pub fn new() -> Result<Self> {
-        // lower timer resolution
+        // Increase system timer precision to 1 ms
         unsafe {
             windows::Win32::Media::timeBeginPeriod(1);
         }

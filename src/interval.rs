@@ -40,6 +40,7 @@ impl TimeInterval {
 }
 
 pub struct Jitter {
+    /// Smoothed offset that creates momentum between clicks
     last_offset: f64,
     click_count: u32,
 }
@@ -52,13 +53,18 @@ impl Jitter {
         }
     }
 
+    /// Returns the next click delay with humanized timing variations
+    ///
+    /// `jitter` parameter controls the standard deviation of timing variations in milliseconds
     pub fn next(&mut self, base: Duration, jitter: u16) -> Duration {
         let base_ms = base.as_millis() as f64;
         let mut rng = rand::rng();
 
+        // Normal distribution for continuous small variations
         let normal = Normal::new(0.0, jitter as f64 / 3.0).unwrap();
         let quick_jitter = normal.sample(&mut rng);
 
+        // 3% chance of hesitation spike using gamma distribution
         let hesitation = if rng.random::<f64>() < 0.03 {
             let gamma = Gamma::new(2.0, jitter as f64 * 0.5).unwrap();
             gamma.sample(&mut rng)
@@ -66,6 +72,7 @@ impl Jitter {
             0.0
         };
 
+        // Exponential moving average for smooth rhythm changes
         self.last_offset = (self.last_offset * 0.85) + (quick_jitter * 0.15);
 
         let final_ms = (base_ms + self.last_offset + hesitation).max(1.0);

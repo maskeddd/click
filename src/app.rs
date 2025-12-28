@@ -80,6 +80,7 @@ impl ClickApp {
         }
     }
 
+    /// Returns the click interval depending on the current mode
     fn calculate_interval(&self) -> Duration {
         match self.interval_mode {
             IntervalMode::Time => self.time_interval.to_duration(),
@@ -113,23 +114,19 @@ impl ClickApp {
         let mut human_jitter = Jitter::new();
 
         let handle = self.clicker.runtime.spawn(async move {
-            // Create initial interval with base duration
             let mut interval = tokio::time::interval(base_interval);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-            // Skip the first immediate tick
             interval.tick().await;
 
             loop {
-                // Compute humanized jittered interval
                 let current_interval = if use_jitter && jitter > 0 {
                     human_jitter.next(base_interval, jitter)
                 } else {
                     base_interval
                 };
 
-                // Recreate interval if the duration changed significantly
-                // (only needed when jitter is in use)
+                // Need to rebuild interval if jitter enabled
                 if use_jitter && jitter > 0 {
                     interval = tokio::time::interval(current_interval);
                     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -152,6 +149,7 @@ impl ClickApp {
                             break;
                         }
                     }
+                    // Stop signal
                     _ = stop_rx.recv() => {
                         break;
                     }
@@ -180,6 +178,7 @@ impl ClickApp {
 
 impl Drop for ClickApp {
     fn drop(&mut self) {
+        // Ensure background task is stopped when app closes.
         if let Some(handle) = self.clicker.task_handle.take() {
             handle.abort();
         }
@@ -192,6 +191,7 @@ impl eframe::App for ClickApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Bottom panel (Start/Stop buttons)
         egui::TopBottomPanel::bottom("bottom_panel")
             .frame(
                 egui::Frame::default()
@@ -227,14 +227,17 @@ impl eframe::App for ClickApp {
                 egui::warn_if_debug_build(ui);
             });
 
+        // Main configuration panel
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Interval");
             ui.add_space(6.0);
 
+            // Interval config
             egui::Grid::new("interval_grid")
                 .num_columns(2)
                 .spacing([10.0, 4.0])
                 .show(ui, |ui| {
+                    // Time interval config
                     ui.radio_value(&mut self.interval_mode, IntervalMode::Time, "Time:");
                     ui.add_enabled_ui(self.interval_mode == IntervalMode::Time, |ui| {
                         ui.horizontal(|ui| {
@@ -273,6 +276,7 @@ impl eframe::App for ClickApp {
                     });
                     ui.end_row();
 
+                    // CPS interval config
                     ui.radio_value(&mut self.interval_mode, IntervalMode::Cps, "Target CPS:");
                     ui.add_enabled_ui(self.interval_mode == IntervalMode::Cps, |ui| {
                         ui.add(
@@ -284,6 +288,7 @@ impl eframe::App for ClickApp {
                     });
                     ui.end_row();
 
+                    // Random delay config
                     ui.checkbox(&mut self.use_jitter, "Random delay: ");
                     ui.add_enabled_ui(self.use_jitter, |ui| {
                         ui.add(
@@ -300,6 +305,7 @@ impl eframe::App for ClickApp {
 
             ui.add(egui::Separator::default().spacing(18.0));
 
+            // Click behavior config
             ui.heading("Behavior");
             ui.add_space(6.0);
 

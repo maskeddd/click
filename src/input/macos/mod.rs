@@ -19,6 +19,7 @@ unsafe impl Send for PlatformInput {}
 
 impl PlatformInput {
     pub fn new() -> Result<Self> {
+        // We need accessibility permissions
         accessibility::ensure_trust();
 
         let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState);
@@ -62,6 +63,7 @@ impl InputBackend for PlatformInput {
         let (down_type, up_type) = Self::get_event_types(button);
         let source = self.source.as_deref();
 
+        // autoreleasepool to prevent leaking
         autoreleasepool(|_| {
             for event_type in [down_type, up_type] {
                 if let Some(event) = CGEvent::new_mouse_event(source, event_type, pos, cg_button) {
