@@ -3,7 +3,7 @@
 use eframe::egui::{self, TextWrapMode, Vec2};
 
 fn main() -> eframe::Result {
-    let size = Vec2::new(420.0, 274.0);
+    let size = Vec2::new(420.0, 360.0);
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

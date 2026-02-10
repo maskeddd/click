@@ -1,6 +1,6 @@
-use std::{fmt, time::Duration};
-
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::{fmt, time::Duration};
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "linux")] {
@@ -17,7 +17,13 @@ cfg_if::cfg_if! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
+pub struct Coordinates {
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub enum MouseButton {
     Left,
     Right,
@@ -40,7 +46,7 @@ impl MouseButton {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub enum ClickAction {
     Single,
     Double,
@@ -63,6 +69,7 @@ impl ClickAction {
 
 pub trait InputBackend: Send {
     fn click(&mut self, button: MouseButton) -> Result<()>;
+    fn move_to(&mut self, coords: Coordinates) -> Result<()>;
 }
 
 pub struct InputHandler {
@@ -87,6 +94,18 @@ impl InputHandler {
                 self.backend.click(button)?;
             }
         }
+        Ok(())
+    }
+
+    pub fn click_at(
+        &mut self,
+        coords: Coordinates,
+        button: MouseButton,
+        click_action: ClickAction,
+    ) -> Result<()> {
+        self.backend.move_to(coords)?;
+        std::thread::sleep(Duration::from_millis(10));
+        self.click(button, click_action)?;
         Ok(())
     }
 }
