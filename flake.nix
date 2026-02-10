@@ -1,6 +1,4 @@
 {
-  description = "click devShell";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
@@ -9,7 +7,6 @@
 
   outputs =
     {
-      self,
       nixpkgs,
       rust-overlay,
       flake-utils,
@@ -25,13 +22,7 @@
       {
         devShells.default = mkShell rec {
           buildInputs = [
-            (rust-bin.stable.latest.default.override {
-              extensions = [
-                "rust-analyzer"
-                "rust-src"
-              ];
-            })
-
+            rust-bin.stable.latest.default
             openssl
             pkg-config
           ]
