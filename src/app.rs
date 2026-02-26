@@ -432,13 +432,15 @@ impl eframe::App for ClickApp {
                         ui.end_row();
 
                         ui.checkbox(&mut self.use_num_clicks, "Repeat only:");
-                        ui.add_enabled_ui(self.use_num_clicks, |ui| {
-                            ui.add(
-                                egui::DragValue::new(&mut self.num_clicks)
-                                    .speed(1.0)
-                                    .range(1..=u32::MAX)
-                                    .suffix(" clicks"),
-                            );
+                        ui.horizontal(|ui| {
+                            ui.add_enabled_ui(self.use_num_clicks, |ui| {
+                                ui.add(
+                                    egui::DragValue::new(&mut self.num_clicks)
+                                        .speed(1.0)
+                                        .range(1..=u32::MAX),
+                                );
+                            });
+                            ui.label("click(s)");
                         });
                         ui.end_row();
                     });
